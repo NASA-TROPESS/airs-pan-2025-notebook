@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "airs_pan_ml"
+description = "Machine learning tools for AIRS PAN quality filters"
+requires-python = ">= 3.8"
+dynamic = ["version"]
+authors = [
+    {name = "Joshua Laughner", email = "josh.laughner@jpl.nasa.gov"},
+]
+dependencies = [
+    "numpy ~= 1.21",
+    "pandas ~= 1.3",
+    "scikit-learn ~= 1.2",
+]
+#classifiers = [
+#    "License :: OSI Approved :: Apache Software License"
+#]
+
+#[project.scripts]
+#make-mip-averages = "tccon_mip_averages.__main__:main"
+
+[project.urls]
+Repository = "https://github.jpl.nasa.gov/laughner/airs-pan-ml"
+Issues = "https://github.jpl.nasa.gov/laughner/airs-pan-ml/issues"
+
+#[tool.setuptools.dynamic]
+#version = {attr = "tccon_mip_averages.version.__version__"}
+
+#[tool.setuptools.packages.find]
+#include = ['tccon_mip_averages']

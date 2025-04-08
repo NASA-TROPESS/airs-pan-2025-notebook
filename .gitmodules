@@ -1,0 +1,3 @@
+[submodule "src/jllutils"]
+	path = src/jllutils
+	url = https://github.com/joshua-laughner/JLL-Py-Utils.git
