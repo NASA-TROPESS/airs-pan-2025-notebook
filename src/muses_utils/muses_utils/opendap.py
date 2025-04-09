@@ -9,7 +9,7 @@ from pydap.cas.urs import setup_session
 
 from jllutils import miscutils
 from jllutils.subutils import ncdf as ncio
-from muses_tools.calculate_xvmr import calculate_xvmr
+from .atmosphere import calculate_xvmr
 
 URL_TEMPLATES = {
     'WCF_CRIS_PAN_STD': 'https://tropess.gesdisc.eosdis.nasa.gov/opendap/TROPESS_Special/TRPSDL2PANCRSWCF.1/{date:%Y}/TROPESS_CrIS-SNPP_L2_Standard_PAN_{date:%Y%m%d}_MUSES_R1p9_SC_F0p1.nc'
@@ -52,7 +52,7 @@ def read_tropess_url(url: str, variables: dict = DEFAULT_TROPESS_VARS, date: Opt
 
     pmax, pmin
         Only used when ``integrate_xgas = "accurate"``, these set the pressure limits to integrate between. The defaults are those used for PAN.
-    
+
     Returns
     -------
     data
@@ -72,7 +72,7 @@ def read_tropess_url(url: str, variables: dict = DEFAULT_TROPESS_VARS, date: Opt
         for i in range(n_tgts):
             pbar.print_bar()
             xgas[i], _, _ = calculate_xvmr(data['vmr'][i].data, data['pres'][i].data, pmax, pmin)
-            
+
         data['xgas'] = xgas
 
     return data
@@ -91,11 +91,11 @@ def calc_xvmr_xarray(vmr, pres, pmax=999999.0, pmin=-0.1):
     assert len(pres.dims) == 2
     assert pres.dims[1] == 'level'
     assert vmr.dims == pres.dims
-    
+
     pwf_layer = pres.isel(level=slice(None, None, -1)).diff(dim='level')
     pwf_layer = pwf_layer / pwf_layer.sum(dim='level')
     pwf_layer = pwf_layer.isel(level=slice(None, None, -1))
-    
+
     pwf_level = xr.DataArray(0., dims=pres.dims, coords=pres.coords)
     pwf_level[:, :-1] = pwf_layer.data
     pwf_level[:, 1:] += pwf_layer.data

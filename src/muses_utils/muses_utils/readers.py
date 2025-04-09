@@ -219,7 +219,7 @@ def find_nc_var(ds: ncdf.Dataset, variable: str, ignore_case: bool = True, retur
             return variable
         else:
             return None
-        
+
     def find_inner(grp, parts=None):
         if parts is None:
             parts = ['']
@@ -228,14 +228,14 @@ def find_nc_var(ds: ncdf.Dataset, variable: str, ignore_case: bool = True, retur
         if varkey is not None:
             parts.append(varkey)
             return '/'.join(parts)
-        
+
         for grpname, grp2 in grp.groups.items():
             var = find_inner(grp2, parts + [grpname])
             if var is not None:
                 return var
-            
+
         return None
-    
+
     var = find_inner(ds)
     if var is None:
         raise KeyError(f'Could not find a variable named "{variable}" in any group of this file.')
@@ -248,7 +248,7 @@ def find_nc_var(ds: ncdf.Dataset, variable: str, ignore_case: bool = True, retur
         read_array = True
     else:
         raise TypeError(f'return_type must be one of: "path", "var", "variable", or "array", not "{return_type}"')
-    
+
     return get_nc_var(ds, var, read_array=read_array, fill=fill)
 
 
@@ -277,7 +277,7 @@ def read_quality_file(file, master_only: bool = False) -> pd.DataFrame:
     --------
     * :func:`read_quality_file_for_species` - a convenience function if your OSPs are installed in the standard location.
     """
-    
+
     with open(file) as f:
         for line in f:
             if line.lower().startswith('end_of_header'):
@@ -292,7 +292,7 @@ def read_quality_file(file, master_only: bool = False) -> pd.DataFrame:
         return df
 
 
-def read_quality_file_for_species(strategy_table: str, species: Optional[str], user: Optional[str] = None, master_only: bool = False, hide_path: bool = False) -> pd.DataFrame:
+def read_quality_file_for_species(strategy_table: str, species: Optional[str], user: Optional[str] = None, master_only: bool = False, strat_table_dir=None, hide_path: bool = False) -> pd.DataFrame:
     """Read a quality file for a given species from a strategy table, assuming the standard OSP layout.
 
     This will read the file at "~/OSP/Strategy_Tables/$USER/$STRATEGY_TABLE/QualityFlags/QualityFlag_Spec_Nadir_$SPECIES.asc".
@@ -318,6 +318,9 @@ def read_quality_file_for_species(strategy_table: str, species: Optional[str], u
         Set to ``True`` to only keep rows in the dataframe when that flag will be 
         used for the master quality flag.
 
+    strat_table_dir
+        If given, this must be the path to the directory containing the various strategy tables; ``user`` will be ignored.
+
     hide_path
         By default, this function will print the file path to the table it read, as a way for you to check that it's reading the
         one you expected. You can turn that off by setting this argument to ``True``.
@@ -332,17 +335,22 @@ def read_quality_file_for_species(strategy_table: str, species: Optional[str], u
     --------
     * :func:`read_quality_file` - read a quality flag file given directly by its path.
     """
-    strat_table_dir = Path('~/OSP/Strategy_Tables').expanduser()
-    if not strat_table_dir.exists():
-        raise IOError('You do not appear to have the OSPs linked to ~/OSP or there is not a Strategy_Tables directory in there.')
-    if user is None:
-        user = os.getlogin()
-        if not (strat_table_dir / user).exists():
-            user = 'ops'
-    
-    strat_table_dir = strat_table_dir / user 
-    if not strat_table_dir.exists():
-        raise IOError(f'Cannot find OSPs for user "{user}"')
+    if strat_table_dir is None:
+        strat_table_dir = Path('~/OSP/Strategy_Tables').expanduser()
+
+        if not strat_table_dir.exists():
+            raise IOError('You do not appear to have the OSPs linked to ~/OSP or there is not a Strategy_Tables directory in there.')
+
+        if user is None:
+            user = os.getlogin()
+            if not (strat_table_dir / user).exists():
+                user = 'ops'
+
+        strat_table_dir = strat_table_dir / user 
+        if not strat_table_dir.exists():
+            raise IOError(f'Cannot find OSPs for user "{user}"')
+    else:
+        strat_table_dir = Path(strat_table_dir)
 
     strat_table_dir = strat_table_dir / strategy_table
     if not strat_table_dir.exists():
@@ -364,22 +372,22 @@ def read_quality_file_for_species(strategy_table: str, species: Optional[str], u
 
 def read_many(targets_dir: str, product_file: str, variables: Sequence[str]) -> dict:
     """A function to read from all targets' product files in a setup-targets directory
-    
+
     This is meant for use when py-combine cannot be used or isn't necessary for quick checks.
-    
+
     Parameters
     ----------
     targets_dir
         Path to the setup-targets or equivalent directory. All sub-directories starting with "20"
         in this directory will be searched as targets.
-        
+
     product_file
         The name of the output file (basename only) to load from in each target.
-        
+
     variables
         The sequence of variables to load; if a variable is in a subgroup, include the group as part
         of the path e.g. "Retrieval/Column".
-        
+
     Returns
     -------
     dict
@@ -389,7 +397,7 @@ def read_many(targets_dir: str, product_file: str, variables: Sequence[str]) -> 
     """
     targets = sorted(Path(targets_dir).glob('20*'))
     ntgt = len(targets)
-    
+
     # Get the shapes and types of all the variables first so we can create
     # arrays of the right size with fill values populated
     data = dict()
@@ -400,10 +408,10 @@ def read_many(targets_dir: str, product_file: str, variables: Sequence[str]) -> 
         if this_product_file.exists():
             first_product_file = this_product_file
             break
-            
+
     if first_product_file is None:
         raise IOError(f'Could not find product file "{product_file}" in any of the {ntgt} directories. Either the file name is wrong, or all soundings failed')
-        
+
     with ncdf.Dataset(first_product_file) as ds:
         for var in variables:
             dtype = ds[var].dtype
@@ -413,18 +421,18 @@ def read_many(targets_dir: str, product_file: str, variables: Sequence[str]) -> 
                 fill = -999
             else:
                 raise NotImplementedError(f'No fill value defined for data type {dtype}')
-                
+
             shape = ds[var].shape
             data[var] = np.full((ntgt,) + shape, fill)
             fills[var] = fill
-            
+
     for itgt, target in enumerate(targets):
         this_product_file = target / 'Products' / product_file
         if not this_product_file.exists():
             continue
-            
+
         with ncdf.Dataset(this_product_file) as ds:
             for var in variables:
                 data[var][itgt] = ds[var][:].filled(fills[var])
-                
+
     return data

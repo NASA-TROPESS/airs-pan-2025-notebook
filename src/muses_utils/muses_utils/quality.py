@@ -877,8 +877,8 @@ class StdPanFilter(MultipleQualityFilterer):
         Otherwise it must be a string that is a valid first argument for ``AirsPanSlopeFilter`` (i.e. "deriv", "slope", or "slope_zero")
         or an actual instance of that class.
     """
-    def __init__(self, strategy_table: str, user: str, add_non_table_filters: bool = True, add_airs_filter: Optional[str] = None):
-        qa_df = readers.read_quality_file_for_species(strategy_table, species='PAN', user=user)
+    def __init__(self, strategy_table: str, user: str, add_non_table_filters: bool = True, add_airs_filter: Optional[str] = None, strat_table_dir=None):
+        qa_df = readers.read_quality_file_for_species(strategy_table, species='PAN', user=user, strat_table_dir=strat_table_dir)
         df_filters = self._qa_df_to_filters(qa_df)
         super().__init__(df_filters)
         if add_non_table_filters:

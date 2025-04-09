@@ -12,8 +12,7 @@ from scipy.interpolate import interp1d
 import xarray as xr
 from warnings import warn
 
-from muses_tools.tools.atmosphere.column_integrate import column_integrate
-from muses_tools.calculate_xvmr import calculate_xvmr
+from muses_utils.atmosphere import column_integrate, calculate_xvmr
 
 from typing import Dict, Optional, Sequence, Union
 
@@ -173,7 +172,7 @@ def match_airs_to_cris(airs_df: pd.DataFrame, cris_df: pd.DataFrame) -> pd.DataF
         warn('Warning: CrIS dataframe source for interpolation contains poor quality retrievals!')
     cris_lon = cris_df['lon'].to_numpy()
     cris_lat = cris_df['lat'].to_numpy()
-    
+
     pbar = miscutils.ProgressBar(airs_df.shape[0], prefix='Matching AIRS to nearest CrIS')
     for airs_sid, airs_row in airs_df.iterrows():
         pbar.print_bar()
@@ -202,7 +201,7 @@ def _load_ak_dataset(l2_product_file: os.PathLike) -> xr.Dataset:
         data['pressure'] = _get_nc_var(ds, 'Pressure')
         data['density'] = _get_nc_var(ds, 'Retrieval/AirDensity')
         data['altitude'] = _get_nc_var(ds, 'Altitude')
-        
+
     nlev = data['pressure'].shape[1]
     levels = np.arange(nlev, dtype=int)
     for k, v in data.items():
@@ -214,9 +213,9 @@ def _load_ak_dataset(l2_product_file: os.PathLike) -> xr.Dataset:
             coords = (sids, levels, levels)
         else:
             raise NotImplementedError(f'v.ndim = {v.ndim}')
-            
+
         data[k] = xr.DataArray(v, dims=dims, coords=coords)
-        
+
     return xr.Dataset(data)
 
 
@@ -231,7 +230,7 @@ def _compute_rodgers_xcols(match_df: pd.DataFrame, airs_ak_dset: xr.Dataset, cri
 
     airs_ak_dset
         Xarray dataset from :func:`load_ak_dataset` containing the AIRS data.
-    
+
     cris_ak_dset
         Xarray dataset from :func:`load_ak_dataset` containing the CrIS data.
 
@@ -274,28 +273,28 @@ def _compute_rodgers_xcols(match_df: pd.DataFrame, airs_ak_dset: xr.Dataset, cri
         z_airs = airs_ak_dset.sel(sounding=airs_sid).altitude.data
         xa_airs = airs_ak_dset.sel(sounding=airs_sid).prior.data
         ak_matrix_airs = airs_ak_dset.sel(sounding=airs_sid).aks.data
-        
+
         cris_sid = match_row['cris_sid']
         p_cris = cris_ak_dset.sel(sounding=cris_sid).pressure.data
         x_cris = cris_ak_dset.sel(sounding=cris_sid).posterior.data
         xa_cris = cris_ak_dset.sel(sounding=cris_sid).prior.data
-        
+
         if np.all(np.isnan(x_airs)) or np.all(np.isnan(x_cris)):
             out_df.loc[airs_sid, 'ak_error_flag'] = -1
             print(f'\nAt least one of AIRS {airs_sid} and CrIS {cris_sid} have all fills, skipping')
             continue
-            
+
         if not _check_priors_consistent(xa_airs, xa_cris):
             out_df.loc[airs_sid, 'ak_error_flag'] = 1
             if skip_different_priors:
                 print(f'\nAIRS {airs_sid} and CrIS {cris_sid} have different priors, skipping')
                 continue
-        
+
         # First just get the x_col_ft AKs for AIRS. Have to deal with
         # fills here because our AK function expects -999s instead of NaNs.
         ok_airs = ~np.isnan(x_airs)
         pw_ak_airs = _compute_x_col_ft_ak(ak_matrix_airs[ok_airs,:][:,ok_airs], p_airs[ok_airs])
-        
+
         # Apply AIRS AKs to CrIS posterior (interpolating CrIS posterior to the AIRS pressures)
         # We'll try this two different ways: we'll use the pressure-weighted column AK, which
         # does a slightly different integration than py-retrieve, and we'll use the AK matrix
@@ -306,7 +305,7 @@ def _compute_rodgers_xcols(match_df: pd.DataFrame, airs_ak_dset: xr.Dataset, cri
         dc = 1e9 * pw_ak_airs @ (x_cris_interp - xa_airs[ok_airs])
         ca = _do_column_integrate(xa_airs[ok_airs], d_airs[ok_airs], z_airs[ok_airs], p_airs[ok_airs])
         out_df.loc[airs_sid, 'c_hat_pwak'] = ca + dc
-        
+
         dx = ak_matrix_airs[ok_airs,:][:,ok_airs] @ (x_cris_interp - xa_airs[ok_airs])
         out_df.loc[airs_sid, 'c_hat_akmat'] = _do_column_integrate(
             xa_airs[ok_airs] + dx,
@@ -321,15 +320,15 @@ def _compute_rodgers_xcols(match_df: pd.DataFrame, airs_ak_dset: xr.Dataset, cri
             dc = 1e9 * pw_ak_airs @ (x_cris_scaled - xa_airs[ok_airs])
             ca = _do_column_integrate(xa_airs[ok_airs], d_airs[ok_airs], z_airs[ok_airs], p_airs[ok_airs])
             out_df.loc[airs_sid, 'c_hat_pwak_bc'] = ca + dc
-            
-        
+
+
     return out_df
 
 
 def _compute_x_col_ft_ak(profile_ak_matrix, pressure_vec, return_with_fills=True, return_debug_info=False):
     pres_range = (215.0, 825.1)
     missing_value = -999.0
-    
+
     # I think we want to match how we subset in the new XPAN800 calculation, rather than exactly following my
     # current version of py-tropess. I'm also going to do the calculation how I think it should be (i.e. 
     # not subsetting the AK matrix columns).
@@ -338,22 +337,22 @@ def _compute_x_col_ft_ak(profile_ak_matrix, pressure_vec, return_with_fills=True
     i_bottom = np.argmin(np.abs(pres_good - pres_range[1]))
     i_top = np.argmin(np.abs(pres_good - pres_range[0]))
     indp = slice(ind_not_fill[i_bottom], ind_not_fill[i_top+1])
-    
+
     _, pwf_level, _ = calculate_xvmr(np.ones_like(pressure_vec[indp]), pressure_vec[indp])
-    
+
     tmp = pwf_level @ profile_ak_matrix[indp,:][:, ind_not_fill]
     if return_with_fills:
         xcol_ak = np.full(pressure_vec.shape, missing_value)
         xcol_ak[ind_not_fill] = tmp
     else:
         xcol_ak = tmp
-        
+
     if return_debug_info:
         return xcol_ak, {'pwf': pwf_level, 'ak_subset': profile_ak_matrix[indp, :][:, ind_not_fill], 'indp': indp}
     else:
         return xcol_ak
 
-        
+
 def _do_column_integrate(x, d, z, p):
     not_fill = ~np.isnan(x)
     i_min = np.argmin(np.abs(p[not_fill] - 825))
@@ -412,14 +411,14 @@ def load_and_merge_quality_vars(orig_df: pd.DataFrame, airs_combine_dirs: Option
         combine_dir = Path(airs_combine_dirs[key])
         l2_file = combine_dir / 'Products_L2-PAN-0.nc'
         rad_file = combine_dir / 'Products_Radiance-PAN.nc'
-    
+
         rad_vars = {
             'radianceResidualRMS': 'RADIANCERESIDUALRMS',
             'radianceResidualMean': 'RADIANCERESIDUALMEAN',
             'CLOUD_MEAN': 'CLOUDOPTICALDEPTH', # weird that cloud optical depth is in the radiance file...
         }
         rad_df = _load_helper(rad_file, rad_vars, 'SOUNDINGID')
-    
+
         # TSUR_vs_Apriori and TSUR-Tatm[0] both seem to be unused, as write_quality_flags.py
         # assigns them values of 0 in the values list. Can't find Calscale Mean, Emission Layer,
         # O3_Ccurve, O3_Slope_QA, O3_tropo_consistency in the files. Skipped Deviation_QA because
@@ -440,14 +439,14 @@ def load_and_merge_quality_vars(orig_df: pd.DataFrame, airs_combine_dirs: Option
             'H2O_Propagated': 'Characterization/Propagated_H2O_QA',
         }
         l2_df = _load_helper(l2_file, l2_vars, 'SoundingID')
-    
+
         this_qual_df = pd.merge(l2_df, rad_df, left_index=True, right_index=True)
         assert this_qual_df.shape[0] == l2_df.shape[0], 'Not all L2 data got associated radiance data.'
         qual_df.append(this_qual_df)
 
     qual_df = pd.concat(qual_df, axis=0)
     return pd.merge(orig_df, qual_df, left_index=True, right_index=True, how='left')
-    
+
 
 def load_and_merge_radiance_vars(orig_df: pd.DataFrame, airs_combine_dirs: Optional[dict] = None) -> pd.DataFrame:
     """Load the observed, fit, and residual radiances as a dataframe and merge them with an existing dataframe.
@@ -472,23 +471,23 @@ def load_and_merge_radiance_vars(orig_df: pd.DataFrame, airs_combine_dirs: Optio
     keys = _get_test_keys_from_df(orig_df)
     if airs_combine_dirs is None:
         airs_combine_dirs = test_cases_by_key('airs', None)
-    
+
     rad_df = []
     for key in keys:
         combine_dir = Path(airs_combine_dirs[key])
         rad_file = combine_dir / 'Products_Radiance-PAN.nc'
-        
+
         with ncdf.Dataset(rad_file) as ds:
             sid = _convert_sounding_ids(_get_nc_var(ds, 'SOUNDINGID'))
             rad_fit = _get_nc_var(ds, 'RADIANCEFIT')
             rad_obs = _get_nc_var(ds, 'RADIANCEOBSERVED')
             rad_freq = _get_nc_var(ds, 'FREQUENCY')
-        
+
         # Must be on a consistent frequency grid to work
         freq_diff = np.diff(rad_freq, axis=0)
         freq_diff = freq_diff[np.isfinite(freq_diff)]
         assert np.allclose(freq_diff, 0), 'Frequency grid must be consistent'
-    
+
         bt_fit = _to_brightness_temperature(rad_freq, rad_fit)
         bt_obs = _to_brightness_temperature(rad_freq, rad_obs)
         bt_resid = bt_fit - bt_obs
@@ -496,7 +495,7 @@ def load_and_merge_radiance_vars(orig_df: pd.DataFrame, airs_combine_dirs: Optio
         # frequency grid.
         i = np.flatnonzero(np.all(~np.isnan(rad_freq), axis=1))[0]
         freq_grid = rad_freq[i]
-    
+
         df_dict = dict()
         for i, freq in enumerate(freq_grid):
             df_dict[f'bt_fit_{freq:.1f}'] = bt_fit[:,i]
@@ -545,7 +544,7 @@ def _calc_xpan800(combined_ds, xx_keep=None):
     xpan = np.full(vmr.shape[0], -999.0)
     if xx_keep is None:
         xx_keep = np.ones(vmr.shape[0], dtype=bool)
-    
+
     pbar = miscutils.ProgressBar(vmr.shape[0], prefix='Calculating XPAN800')
     for i in range(vmr.shape[0]):
         pbar.print_bar()
@@ -571,7 +570,7 @@ def _calc_xpan800(combined_ds, xx_keep=None):
 def _load_helper(file, variables, sid_var='SoundingID', land_only=True):
     if not isinstance(variables, dict):
         variables = {v: v for v in variables}
-                                     
+
     with ncdf.Dataset(file) as ds:
         sounding_ids = _convert_sounding_ids(_get_nc_var(ds, sid_var))
         if land_only and 'LandFlag' in ds.variables:
@@ -580,7 +579,7 @@ def _load_helper(file, variables, sid_var='SoundingID', land_only=True):
             sounding_ids = sounding_ids[xx_keep]
         else:
             xx_keep = None
-            
+
         data = dict()
         for key, var in variables.items():
             if isinstance(var, str): 
@@ -590,7 +589,7 @@ def _load_helper(file, variables, sid_var='SoundingID', land_only=True):
             else:
                 data[key] = var(ds, xx_keep)
             assert data[key].ndim == 1, f'{key} is not 1D, is actually {data[key].ndim}D'
-            
+
     return pd.DataFrame(data, index=sounding_ids)
 
 def find_h2o_file_for_bias_corr(pan_file):
@@ -625,7 +624,7 @@ def iter_test_cases(root_dir, file=None):
         file = 'Products_L2-PAN-0.nc' if file == 'default' else file
     else:
         root_dir = Path(root_dir)
-    
+
     cases = [
         ('aus-jan01', '2020-01-01', 'Australian_Fires_PAN'),
         ('aus-jan05', '2020-01-05', 'Australian_Fires_PAN'),
@@ -636,12 +635,12 @@ def iter_test_cases(root_dir, file=None):
         ('glo-jun10', '2023-06-10', 'Global_Survey_Grid_0.7'),
         ('glo-jun13', '2023-06-13', 'Global_Survey_Grid_0.7')
     ]
-    
+
     for key, date, profile in cases:
         test_path = root_dir / date / 'combine' / profile
         if file is not None:
             test_path = test_path / file
-        
+
         if not test_path.exists():
             err_file = 'combine directory' if file is None else file
             raise IOError(f'{err_file} not found for {date} {profile} (path = {test_path})')

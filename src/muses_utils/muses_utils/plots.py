@@ -1,35 +1,27 @@
 from abc import ABC, abstractmethod
 from copy import copy
-from csv import reader
 import matplotlib.pyplot as plt
 from matplotlib.gridspec import GridSpec
 from matplotlib import cm
-import netCDF4 as ncdf
 import numpy as np
 import pandas as pd
 from pathlib import Path
 import netCDF4 as ncdf
-from string import ascii_lowercase
 from warnings import warn
 
 from cartopy import crs as ccrs
-import cartopy.io.shapereader as shpreader
 import cartopy.feature as cfeature
 
 from jllutils import units as junits
 from jllutils import miscutils
-from muses_tools.tools.atmosphere.column_integrate import column_integrate
 
 from . import readers
+from .atmosphere import column_integrate
 from .conversions import bt
 from .readers import get_nc_var, convert_sounding_ids, convert_sounding_array
 from .helpers import LetterLabeler, AbstractLabeler, DeprecatedError, find_attribute
 
 from typing import Optional, Sequence, Tuple, Callable
-
-_reader = shpreader.Reader(str(Path(__file__).parent / 'geodata' / 'cb_2018_us_state_20m' / 'cb_2018_us_state_20m.shp'))
-_states = _reader.geometries()
-_state_features = cfeature.ShapelyFeature(_states, ccrs.PlateCarree())
 
 
 class AbstractMapFeature(ABC):
@@ -45,9 +37,9 @@ class MapFeatureCoastlines(ABC):
 
 class MapFeatureStates(ABC):
     def add(self, ax):
-        ax.add_feature(_state_features, facecolor='none', edgecolor='k')
+        ax.add_feature(cfeature.STATES, facecolor='none', edgecolor='k')
 
-    
+
 def _is_freq_consistent(freq):
     deltas = _freq_consistency_diff(freq)
     return np.allclose(deltas, 0)
@@ -96,7 +88,7 @@ class SummaryIdConverter(AbstractIdConverter):
 
         raise NotImplementedError(f'Cannot get the date for a summary file without datetime_utc ({ds.filepath()})')
 
-        
+
     def convert_ids(self, ds):
         ids = ds[self.id_var][:].data  # assume that the ID will not be a fill value
         ids = [f'{i:012d}' for i in ids]
@@ -179,7 +171,7 @@ class AbstractWindowStat(ABC):
             spec = get_nc_var(ds, self._spec_var) if self._spec_var else None
             qual_flag = get_nc_var(ds, self._quality_var) if self._quality_var is not None else None
             sids = self._convert_sounding_ids(ds)
-            
+
         freq, spec = self._get_window(freq, spec)
         spec_stat = self.operation(freq, spec)
 
@@ -192,7 +184,7 @@ class AbstractWindowStat(ABC):
             return df.loc[qq, :]
         else:
             return df
-        
+
     def _get_window(self, freq, spec):
         if not _is_freq_consistent(freq):
             spec = np.copy(spec)
@@ -290,13 +282,13 @@ class WindowDirectRead(AbstractWindowStat):
 
 class WindowMean(AbstractWindowStat):
     """Computes the mean of the spectral variable in the window.
-    
+
     All inputs are the same as :class:`AbstractWindowStat`.
     """
     @property
     def label(self):
         return f'Mean {self._spec_var} in {self._win_min} to {self._win_max} cm$^{{-1}}$'
-        
+
     def operation(self, freq, spec):
         return np.nanmean(spec, axis=1)
 
@@ -341,7 +333,7 @@ class XgasCalc(AbstractWindowStat):
         self._quality_var = quality_var
         self._filter_quality = quality_var is not None if filter_on_quality is None else filter_on_quality
         self._show_int_prog = show_integration_progress
-        
+
 
     @property
     def label(self):
@@ -502,7 +494,7 @@ class XColFt(WindowDirectRead):
     """
     def __init__(self, combined_file: str, spec_var: str = 'x_col_ft', lon_var: str = 'longitude', lat_var: str = 'latitude', 
                  id_var: Optional[str] = None):
-                    
+
         super().__init__(
             combined_file=combined_file,
             spec_var=spec_var,
@@ -519,8 +511,8 @@ class XColFt(WindowDirectRead):
             units = ds[self._spec_var].units
             units = {'1e-9': 'ppb'}.get(units, units)
         return f'{quantity} ({units})'
-    
-    
+
+
 class WindowDiffMean(WindowMean):
     """Computes the mean difference in the window between two spectral variables.
 
@@ -536,11 +528,11 @@ class WindowDiffMean(WindowMean):
                          lon_var=lon_var, lat_var=lat_var, quality_var=quality_var, filter_on_quality=filter_on_quality, id_var=id_var)
         self._spec_var2 = spec_var2
         self._use_perdiff = perdiff
-        
+
     @property
     def label(self):
         return f'Mean {self._spec_var} - {self._spec_var2} in {self._win_min} to {self._win_max} cm$^{{-1}}$'
-        
+
     def compute_window_stats(self):
         with ncdf.Dataset(self.combined_file) as ds:
             lon = get_nc_var(ds, self._lon_var)
@@ -550,7 +542,7 @@ class WindowDiffMean(WindowMean):
             spec2 = get_nc_var(ds, self._spec_var2)
             qual_flag = get_nc_var(ds, self._quality_var) if self._quality_var is not None else None
             sids = self._convert_sounding_ids(ds)
-            
+
         spec = spec1 - spec2 if not self._use_perdiff else (spec1 - spec2)/spec2 * 100
         freq, spec = self._get_window(freq, spec)
         spec_stat = self.operation(freq, spec)
@@ -563,7 +555,7 @@ class WindowDiffMean(WindowMean):
             return df.loc[qq, :]
         else:
             return df
-    
+
 
 class WindowDiffRMS(WindowDiffMean):
     @property
@@ -594,11 +586,11 @@ class WindowFileDiffMean(WindowMean):
         self.combined_file2 = combined_file2
         self._use_perdiff = perdiff
         self._index_by_sid = index_by_sid
-        
+
     @property
     def label(self):
         return f'Mean {self._spec_var} file1 - file2 in {self._win_min} to {self._win_max} cm$^{{-1}}$'
-    
+
     def compute_window_stats(self):
         with ncdf.Dataset(self.combined_file) as ds:
             lon = get_nc_var(ds, self._lon_var)
@@ -607,14 +599,14 @@ class WindowFileDiffMean(WindowMean):
             freq1 = get_nc_var(ds, self._freq_var)
             spec1 = get_nc_var(ds, self._spec_var)
             qual_flag1 = get_nc_var(ds, self._quality_var) if self._quality_var is not None else None
-            
+
         with ncdf.Dataset(self.combined_file2) as ds:
             # We assume that if the sounding IDs match the lat/lon do
             sid2 = self._convert_sounding_ids(ds)
             freq2 = get_nc_var(ds, self._freq_var)
             spec2 = get_nc_var(ds, self._spec_var)
             qual_flag2 = get_nc_var(ds, self._quality_var) if self._quality_var is not None else None
-            
+
         _are_files_matched(sid1, sid2, freq1, freq2)
         freq, spec = self._get_window(freq1, spec1 - spec2 if not self._use_perdiff else (spec1 - spec2)/spec2 * 100)
         spec_stat = self.operation(freq, spec)
@@ -643,11 +635,11 @@ class WindowAtLevel(AbstractWindowStat):
                  lon_var: str = 'Longitude', lat_var: str = 'Latitude', quality_var: str = 'Quality', filter_on_quality: bool = True, id_var: Optional[str] = None):
         super().__init__(combined_file, freq_var, spec_var, window_min, window_max, lon_var, lat_var, quality_var, filter_on_quality, id_var)
         self.target_level = target_level
-        
+
     @property
     def label(self):
         return f'{self._spec_var} at level {self.target_level}'
-        
+
     def operation(self, freq, spec):
         # NB: freq can be e.g. pressure, it's just reused from spectral variables
         if np.ndim(freq) == 1:
@@ -674,7 +666,7 @@ class WindowAtLevelIndex(AbstractWindowStat):
                  lon_var: str = 'Longitude', lat_var: str = 'Latitude', quality_var: str = 'Quality', filter_on_quality: bool = True, id_var: Optional[str] = None):
         super().__init__(combined_file, freq_var, spec_var, window_min, window_max, lon_var, lat_var, quality_var, filter_on_quality, id_var)
         self.target_index = target_index
-        
+
     @property
     def label(self):
         return f'{self._spec_var} at level index={self.target_index}'
@@ -702,14 +694,14 @@ class WindowAtSurface(AbstractWindowStat):
     def __init__(self, combined_file: str, freq_var: str = 'Pressure', spec_var: str = 'Species', window_min: float = 0, window_max: float = 1100, 
                  lon_var: str = 'Longitude', lat_var: str = 'Latitude', quality_var: str = 'Quality', filter_on_quality: bool = True, id_var: Optional[str] = None):
         super().__init__(combined_file, freq_var, spec_var, window_min, window_max, lon_var, lat_var, quality_var, filter_on_quality, id_var)
-        
+
     @property
     def label(self):
         return f'{self._spec_var} at surface'
-        
+
     def operation(self, freq, spec):
         surf_inds = self.find_surf_inds(freq)
-        
+
         # Use numpy's advanced indexing to quickly extract the surface levels
         # Rows with all NaNs in the pressure array will have NaN in the values
         values = spec[(np.arange(spec.shape[0]), surf_inds)]
@@ -737,7 +729,7 @@ class WindowAtSurface(AbstractWindowStat):
         # First check that `pres` really is pressure - should decrease monotonically (except for NaNs)
         dp = np.diff(pres, axis=1)
         assert np.all(dp[~np.isnan(dp)] < 0), 'Grid coordinate does not appear to be pressure (non monotonically decreasing)'
-        
+
         # nanargmax gives a ValueError if it operates on an all-NaN slice, so handle such rows separately
         xx = np.all(np.isnan(pres), axis=1)
         surf_inds = np.full(pres.shape[0], -1)
@@ -912,13 +904,13 @@ class CompositeReader(AbstractWindowStat):
 
         return pd.concat(dfs, axis=1)
 
-        
+
     def _get_window(self, freq, spec):
         raise NotImplementedError('`_get_window` should not be called directly on a CompositeReader instance')
-        
-    
-    
-    
+
+
+
+
 def plot_window_stat_map(window_stat: AbstractWindowStat, domain: Sequence[float] = (-128.0, -100.0, 30.0, 51.0), stat_scale=1,
                          ax=None, cblabel=None, map_features: Sequence[AbstractMapFeature] = (MapFeatureStates(),), **scatter_kws):
     """Plot a map of a spectral variable 
@@ -945,7 +937,7 @@ def plot_window_stat_map(window_stat: AbstractWindowStat, domain: Sequence[float
     if ax is None:
         fig = plt.figure(figsize=(20, 10))
         ax = fig.add_subplot(1,1,1,projection=ccrs.PlateCarree())
-        
+
     for feature in map_features:
         feature.add(ax)
     ax.set_extent(domain)
@@ -1001,7 +993,7 @@ class AbstractBoxes(ABC):
 
         int
             Array index in latitudinal direction. Only given if ``with_indices`` is ``True``.
-            
+
         float
             West edge of the box.
 
@@ -1133,12 +1125,12 @@ class RectBoxes(AbstractBoxes):
         self.latmax = latmax
         self._lons = np.arange(self.lonmin, self.lonmax, self._width)
         self._lats = np.arange(self.latmax, self.latmin, -self._height)
-    
+
     @property
     def domain(self) -> Tuple[float, float, float, float]:
         """The actual domain being plotted (lonmin, lonmax, latmin, latmax). May be different from input domain depending on box alignment."""
         return self._lons[0], self._lons[-1]+self._width, self._lats[-1] - self._height, self._lats[0]
-        
+
 
 class RectBoxesByNumber(AbstractBoxes):
     """A class used to divide up soundings into boxes for average spectral plots
@@ -1177,7 +1169,7 @@ class RectBoxesByNumber(AbstractBoxes):
         lon_edge = self._lons[-1] + self._width
         if not np.isclose(lon_edge, lonmax):
             warn(f'Longitude east edge not quite equal to specified lonmax: {lon_edge} vs. {lonmax}')
-        
+
         lat_edge = self._lats[-1] - self._height
         if not np.isclose(lat_edge, latmin):
             warn(f'Latitude south edge not quite equal to specified latmin: {lat_edge} vs. {latmin}')
@@ -1210,8 +1202,8 @@ class RectBoxesByNumber(AbstractBoxes):
             nlon=nlon, 
             nlat=nlat
         )
-    
-    
+
+
 class AbstractSpecPlot(ABC):
     @property
     @abstractmethod
@@ -1231,7 +1223,7 @@ class AbstractSpecPlot(ABC):
     @abstractmethod
     def plot_spectrum(self, ax, xx_box):
         """Plot the spectrum mean and quantile range
-        
+
         Parameters
         ----------
         ax
@@ -1304,10 +1296,10 @@ class SpecMeanAndQuantile(AbstractSpecPlot):
         Allow plotting even if the frequencies are not the same across all soundings
     """
     def __init__(self, combined_file: str, freq_var: str, spec_var: str, p: Tuple[float, float]=[5.0, 95.0],
-                window: Optional[Tuple[float, float]]=None, legend_kws: Optional[dict] = None, 
-                spec_style: Optional[dict] = None, p_style: Optional[dict] = None, 
-                filter_fxn: Optional[Callable[[np.ndarray], np.ndarray]] = None,
-                override_freq_check: bool = False):
+                 window: Optional[Tuple[float, float]]=None, legend_kws: Optional[dict] = None, 
+                 spec_style: Optional[dict] = None, p_style: Optional[dict] = None, 
+                 filter_fxn: Optional[Callable[[np.ndarray], np.ndarray]] = None,
+                 override_freq_check: bool = False):
         self.combined_file = combined_file
         self._freq_var = freq_var
         self._spec_var = spec_var
@@ -1318,15 +1310,15 @@ class SpecMeanAndQuantile(AbstractSpecPlot):
         self._leg_kws = dict() if legend_kws is None else legend_kws
         self._leg_kws.setdefault('loc', 'upper right')
         self._leg_kws.setdefault('fontsize', 9)
-        
+
         self._spec_style = dict() if spec_style is None else spec_style
         self._spec_style.setdefault('color', 'k')
         self._spec_style.setdefault('label', '$N = {n_spec}$')
-        
+
         self._p_style = dict() if p_style is None else p_style
         self._p_style.setdefault('color', 'lightgray')
         self._p_style.setdefault('alpha', 0.5)
-        
+
     @property
     def title(self):
         """Title to give the overall plot"""
@@ -1348,10 +1340,10 @@ class SpecMeanAndQuantile(AbstractSpecPlot):
     def ylabel(self):
         """Label to give the y-axis of the plot"""
         return self._spec_var
-        
+
     def plot_spectrum(self, ax, xx_box):
         """Plot the spectrum mean and quantile range
-        
+
         Parameters
         ----------
         ax
@@ -1374,7 +1366,7 @@ class SpecMeanAndQuantile(AbstractSpecPlot):
             xx = self._filter_fxn(spec)
             spec[~xx] = np.nan
             return freq, spec
-        
+
     def _plot_inner(self, ax, xx_box, freq, spec):
         if not _is_freq_consistent(freq):
             if self._override_freq_check:
@@ -1383,16 +1375,16 @@ class SpecMeanAndQuantile(AbstractSpecPlot):
                 warn(f'Frequencies not consistent, but overriding the check. Max abs. difference was {freq_delta[imax]} at index {imax}')
             else:
                 raise ValueError('Expected frequencies to be the same for all soundings')
-            
+
         # Use nanmean instead of selecting the first frequency to avoid issues when the first
         # frequency is all NaNs or we overrode the consistency check
         freq = np.nanmean(freq, axis=0)
-        
+
         if self._window is not None:
             xx_freq = (freq >= self._window[0]) & (freq <= self._window[1])
         else:
             xx_freq = np.ones(freq.shape, dtype=np.bool_)
-            
+
         mean_spec = np.nanmean(spec[xx_box], axis=0)
         n_spec = np.shape(spec[xx_box])[0]
         spec_style = copy(self._spec_style)
@@ -1415,7 +1407,7 @@ class SpecMeanAndQuantileBT(SpecMeanAndQuantile):
 
     def plot_spectrum(self, ax, xx_box):
         """Plot the spectrum mean and quantile range
-        
+
         Parameters
         ----------
         ax
@@ -1431,8 +1423,8 @@ class SpecMeanAndQuantileBT(SpecMeanAndQuantile):
             spec = bt(freq, spec)
             freq, spec = self._apply_filter(freq, spec)
         self._plot_inner(ax, xx_box, freq, spec)
-        
-        
+
+
 class SpecVarDiffMeanAndQuantile(SpecMeanAndQuantile):
     """Class that plots the difference between two spectra in one file.
 
@@ -1443,7 +1435,7 @@ class SpecVarDiffMeanAndQuantile(SpecMeanAndQuantile):
     def __init__(self, combined_file, freq_var, spec_var, spec_var2, p=[5.0, 95.0], window=None, legend_kws=None,  spec_style=None, p_style=None, filter_fxn=None):
         super().__init__(combined_file=combined_file, freq_var=freq_var, spec_var=spec_var, p=p, window=window, legend_kws=legend_kws,  spec_style=spec_style, p_style=p_style, filter_fxn=filter_fxn)    
         self._spec_var2 = spec_var2
-        
+
     @property
     def title(self):
         if self._window is None:
@@ -1454,7 +1446,7 @@ class SpecVarDiffMeanAndQuantile(SpecMeanAndQuantile):
     @property
     def ylabel(self):
         return f'{self._spec_var} - {self._spec_var2}'
-        
+
     def plot_spectrum(self, ax, xx_box):
         with ncdf.Dataset(self.combined_file) as combined_ds:
             freq = get_nc_var(combined_ds, self._freq_var)
@@ -1472,7 +1464,7 @@ class SpecVarDiffMeanAndQuantile(SpecMeanAndQuantile):
             xx = self._filter_fxn(spec2)
             spec2[~xx] = np.nan
             return freq, spec, spec2
-        
+
 
 class SpecVarDiffMeanAndQuantileBT(SpecVarDiffMeanAndQuantile):
     """Same as :class:`SpecVarDiffMeanAndQuantile` except the y-axis is converted from radiance to brightness temperature."""
@@ -1489,8 +1481,8 @@ class SpecVarDiffMeanAndQuantileBT(SpecVarDiffMeanAndQuantile):
             spec2 = bt(freq, spec2)
             freq, spec, spec2 = self._apply_filter(freq, spec, spec2)
         self._plot_inner(ax, xx_box, freq, spec - spec2)
-        
-        
+
+
 class SpecFileDiffMeanAndQuantile(SpecMeanAndQuantile):
     """Class to plot the difference in one spectral variable between two ``py-combine`` output files.
 
@@ -1504,14 +1496,14 @@ class SpecFileDiffMeanAndQuantile(SpecMeanAndQuantile):
         super().__init__(combined_file=combined_file, freq_var=freq_var, spec_var=spec_var, p=p, window=window, legend_kws=legend_kws,  spec_style=spec_style, p_style=p_style)
         self.combined_file2 = combined_file2
         self._id_var = id_var
-        
+
     @property
     def title(self):
         if self._window is None:
             return f'{self._spec_var} difference (file1 - file2)'
         else:
             return f'{self._spec_var} difference (file1 - file2) in {self._window[0]} to {self._window[1]} cm$^{{-1}}$'
-        
+
     def plot_spectrum(self, ax, xx_box):
         with ncdf.Dataset(self.combined_file) as ds:
             sid = get_nc_var(ds, self._id_var)
@@ -1521,11 +1513,11 @@ class SpecFileDiffMeanAndQuantile(SpecMeanAndQuantile):
             sid2 = get_nc_var(ds, self._id_var)
             freq2 = get_nc_var(ds, self._freq_var)
             spec2 = get_nc_var(ds, self._spec_var)
-            
+
         _are_files_matched(sid, sid2, freq, freq2)
-            
+
         self._plot_inner(ax, xx_box, freq, spec - spec2)
-        
+
 
 class SpecFileDiffMeanAndQuantileBT(SpecFileDiffMeanAndQuantile):
     """Same as :class:`SpecFileDiffMeanAndQuantile` except the y-axis is converted from radiance to brightness temperature."""
@@ -1544,11 +1536,11 @@ class SpecFileDiffMeanAndQuantileBT(SpecFileDiffMeanAndQuantile):
             freq2 = get_nc_var(ds, self._freq_var)
             spec2 = get_nc_var(ds, self._spec_var)
             spec2 = bt(freq2, spec2)
-            
+
         _are_files_matched(sid, sid2, freq, freq2)
-            
+
         self._plot_inner(ax, xx_box, freq, spec - spec2)
-        
+
 class SpecMulti:
     """Plot multiple spectra/spectra differences into each axes in :py:func:`plot_box_spectra` or similar functions.
 
@@ -1559,21 +1551,21 @@ class SpecMulti:
     """
     def __init__(self, *plotters):
         self._plotters = plotters
-        
+
     @property
     def title(self):
         return 'Multiple'
-        
+
     @property
     def combined_file(self):
         return self._plotters[0].combined_file
-    
+
     def plot_spectrum(self, ax, xx_box):
         for plotter in self._plotters:
             plotter.plot_spectrum(ax, xx_box)
 
 
-def plot_boxes(boxdef: RectBoxes, map_features=(_state_features,), box_cmap='Dark2', labeler: AbstractLabeler = LetterLabeler(), ax=None):
+def plot_boxes(boxdef: RectBoxes, map_features=(cfeature.STATES,), box_cmap='Dark2', labeler: AbstractLabeler = LetterLabeler(), ax=None):
     if ax is None:
         _, ax = plt.subplots(subplot_kw={'projection': ccrs.PlateCarree()})
 
@@ -1589,14 +1581,14 @@ def plot_boxes(boxdef: RectBoxes, map_features=(_state_features,), box_cmap='Dar
         label = labeler.get_label(idx)
 
         ax.plot([lon1, lon1, lon2, lon2, lon1], [lat1, lat2, lat2, lat1, lat1], 
-                    color=color, ls='--')
+                color=color, ls='--')
         ax.text(0.5*(lon1+lon2), 0.5*(lat1+lat2), labeler.get_label(idx), color=color, ha='center', va='center')
 
         boxes[label] = {'lonmin': lon1, 'lonmax': lon2, 'latmin': lat1, 'latmax': lat2}
 
     return boxes
-    
-    
+
+
 def plot_box_spectra(plotter: AbstractSpecPlot, boxdef: RectBoxes, lonvar: str = 'LONGITUDE', latvar: str = 'LATITUDE', 
                      labeler: AbstractLabeler = LetterLabeler(), sharey: bool = True, absolute_labels: bool = False, grid: bool = False,
                      x_fig_size=4, y_fig_size=2):
@@ -1626,7 +1618,7 @@ def plot_box_spectra(plotter: AbstractSpecPlot, boxdef: RectBoxes, lonvar: str =
     # for the map
     nx = boxdef.nx
     ny = boxdef.ny
-    
+
     fig = plt.figure(figsize=(nx*x_fig_size, (ny+2)*y_fig_size))
     gs = GridSpec(ny+2, nx, figure=fig, wspace=0.5, hspace=0.33)
     x1 = nx // 2 - 1
@@ -1634,21 +1626,21 @@ def plot_box_spectra(plotter: AbstractSpecPlot, boxdef: RectBoxes, lonvar: str =
         x2 = x1 + 2
     else:
         x2 = x1 + 3
-        
+
     ax_map = fig.add_subplot(gs[0:2, x1:x2], projection=ccrs.PlateCarree())
-    ax_map.add_feature(_state_features, facecolor='none', edgecolor='k')
+    ax_map.add_feature(cfeature.STATES, facecolor='none', edgecolor='k')
     ax_map.set_extent(boxdef.domain)
     if grid:
         ax_map.gridlines(draw_labels=True, ls=':')
     ax_map.set_title(plotter.title)
-    
+
     box_cmap = cm.get_cmap('Dark2')
-    
-    
+
+
     with ncdf.Dataset(plotter.combined_file) as ds:
         data_lon = get_nc_var(ds, lonvar)
         data_lat = get_nc_var(ds, latvar)
-        
+
     idx = -1
     ax_first = None
     for i, j, lon1, lon2, lat1, lat2 in boxdef.iter_boxes():
