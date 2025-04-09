@@ -1,0 +1,12 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "MUSESUtils"
+description = "Python utilities for working with MUSES data"
+requires-python = ">= 3.8"
+dynamic = ["version"]
+authors = [
+    {name = "Joshua Laughner", email = "josh.laughner@jpl.nasa.gov"},
+]

@@ -19,15 +19,8 @@ dependencies = [
 #    "License :: OSI Approved :: Apache Software License"
 #]
 
-#[project.scripts]
-#make-mip-averages = "tccon_mip_averages.__main__:main"
 
 [project.urls]
 Repository = "https://github.jpl.nasa.gov/laughner/airs-pan-ml"
 Issues = "https://github.jpl.nasa.gov/laughner/airs-pan-ml/issues"
 
-#[tool.setuptools.dynamic]
-#version = {attr = "tccon_mip_averages.version.__version__"}
-
-#[tool.setuptools.packages.find]
-#include = ['tccon_mip_averages']
