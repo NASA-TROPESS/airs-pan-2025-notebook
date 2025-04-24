@@ -366,7 +366,7 @@ def _do_column_integrate(x, d, z, p):
         minIndex=i_min,
         maxIndex=i_max
     )
-    return result.column / result.columnAir * 1e9
+    return result['column'] / result['columnAir'] * 1e9
 
 
 def _check_priors_consistent(xa1, xa2):
@@ -563,7 +563,7 @@ def _calc_xpan800(combined_ds, xx_keep=None):
                 #minPressure=np.asarray([200]),
                 #maxPressure=np.asarray([800])
             )
-            xpan[i] = result.column / result.columnAir * 1e9
+            xpan[i] = result['column'] / result['columnAir'] * 1e9
     return xpan[xx_keep]
 
 
@@ -615,12 +615,12 @@ def compute_h2o_bias_corr(h2o_ds, pan_sids=None):
     return 0.05 + 0.035e-23 * h2o_column, h2o_column
 
 
-def iter_test_cases(root_dir, file=None):
+def iter_test_cases(root_dir, file=None, must_exist=False):
     if root_dir == 'airs':
-        root_dir = Path('/home/laughner/notebooks/pan-camel/static-data/validation/airs-runs/airs/')
+        root_dir = Path('extra-data/validation/airs-runs/airs/')
         file = 'Products_L2-PAN-0.nc' if file == 'default' else file
     elif root_dir == 'cris':
-        root_dir = Path('/home/laughner/notebooks/pan-camel/static-data/validation/airs-runs/cris/')
+        root_dir = Path('extra-data/validation/airs-runs/cris/')
         file = 'Products_L2-PAN-0.nc' if file == 'default' else file
     else:
         root_dir = Path(root_dir)
@@ -641,7 +641,7 @@ def iter_test_cases(root_dir, file=None):
         if file is not None:
             test_path = test_path / file
 
-        if not test_path.exists():
+        if not test_path.exists() and must_exist:
             err_file = 'combine directory' if file is None else file
             raise IOError(f'{err_file} not found for {date} {profile} (path = {test_path})')
         yield key, test_path
