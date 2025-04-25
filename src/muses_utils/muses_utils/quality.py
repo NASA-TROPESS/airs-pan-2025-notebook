@@ -1457,7 +1457,7 @@ class PCALowCloudPANFilterer(AbstractFilterWithCache):
         When to recalculate the PCA coefficients: always, never, if the cache file is missing, or if the cache file does not match (default).
     """
     def __init__(self, coeff_threshold: float = -10, cloud_component_index: int = 1, 
-                 pca_file: str = '/tb/lt_ref17/laughner/notebook-data/camel/daily/20230202-cloud-filtering/west_coast_fire_pca.nc', 
+                 pca_file: str = 'data/west_coast_fire_pca.nc', 
                  use_n_components: int = 2, rad_file_fxn = None, stride_for_testing: int = 1, recalc_mode: RecalcMode = RecalcMode.IF_NEEDED):
         if cloud_component_index >= use_n_components:
             raise ValueError('cloud_component_index is greater than or equal to the number of components being fit')

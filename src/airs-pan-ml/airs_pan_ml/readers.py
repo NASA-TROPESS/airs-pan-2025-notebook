@@ -511,7 +511,7 @@ def _load_muses_dataset(combined_file, land_only=True):
     with ncdf.Dataset(combined_file) as ds:
         xpan_found = 'XPAN800' in ds.groups['Retrieval'].variables.keys()
         vars = {
-            'xpan': 'Retrieval/XPAN800' if xpan_found else _calc_xpan800,
+            'xpan': 'Retrieval/XPAN800' if xpan_found else calc_xpan800,
             'lon': 'Longitude',
             'lat': 'Latitude',
             'timestamp': 'Time',
@@ -536,7 +536,7 @@ def _load_interp_cris(interp_file):
         return pd.DataFrame(data, index=sid)
 
 
-def _calc_xpan800(combined_ds, xx_keep=None):
+def calc_xpan800(combined_ds, xx_keep=None):
     vmr = _get_nc_var(combined_ds, 'Species')
     air_dens = _get_nc_var(combined_ds, 'Retrieval/AirDensity')
     alt = _get_nc_var(combined_ds, 'Altitude')
@@ -617,10 +617,10 @@ def compute_h2o_bias_corr(h2o_ds, pan_sids=None):
 
 def iter_test_cases(root_dir, file=None, must_exist=False):
     if root_dir == 'airs':
-        root_dir = Path('extra-data/validation/airs-runs/airs/')
+        root_dir = Path('data/validation/airs-runs/airs/')
         file = 'Products_L2-PAN-0.nc' if file == 'default' else file
     elif root_dir == 'cris':
-        root_dir = Path('extra-data/validation/airs-runs/cris/')
+        root_dir = Path('data/validation/airs-runs/cris/')
         file = 'Products_L2-PAN-0.nc' if file == 'default' else file
     else:
         root_dir = Path(root_dir)
