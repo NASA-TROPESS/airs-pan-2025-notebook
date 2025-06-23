@@ -1,6 +1,6 @@
 # Supporting notebook for "An algorithm to retrieve peroxyacetal nitrate from AIRS"
 
-[![DOI](https://zenodo.org/badge/975002133.svg)](https://doi.org/10.5281/zenodo.15305278)
+[![DOI](https://zenodo.org/badge/975002133.svg)](https://zenodo.org/badge/latestdoi/975002133)
 
 ## Initial setup
 
