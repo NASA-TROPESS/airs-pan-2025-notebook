@@ -11,7 +11,7 @@
 
 ### Downloading the data
 
-This notebook relies on the dataset associated with the paper, available at https://doi.org/10.22002/f6p6y-e3s79.
+This notebook relies on the dataset associated with the paper, available at https://doi.org/10.22002/exv89-7v481.
 It must be downloaded to the directory named `data` in the same directory as this readme and the notebook.
 That is, once the data are downloaded, the directory structure should look like so:
 
@@ -19,6 +19,7 @@ That is, once the data are downloaded, the directory structure should look like 
 .
 ├── airs-pan-paper-figures.ipynb
 ├── data
+│   ├── climatology_PAN_prior.nc
 │   ├── goes-abi
 │   ├── modis-clouds
 │   ├── spectral-signatures.nc
