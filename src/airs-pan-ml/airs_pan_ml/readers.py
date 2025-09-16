@@ -325,7 +325,7 @@ def _compute_rodgers_xcols(match_df: pd.DataFrame, airs_ak_dset: xr.Dataset, cri
     return out_df
 
 
-def _compute_x_col_ft_ak(profile_ak_matrix, pressure_vec, return_with_fills=True, return_debug_info=False):
+def _compute_x_col_ft_ak(profile_ak_matrix, pressure_vec, return_with_fills=True, return_debug_info=False, normalize=False):
     pres_range = (215.0, 825.1)
     missing_value = -999.0
 
@@ -341,6 +341,19 @@ def _compute_x_col_ft_ak(profile_ak_matrix, pressure_vec, return_with_fills=True
     _, pwf_level, _ = calculate_xvmr(np.ones_like(pressure_vec[indp]), pressure_vec[indp])
 
     tmp = pwf_level @ profile_ak_matrix[indp,:][:, ind_not_fill]
+    if normalize:
+        # From Eq. (11) of https://doi.org/10.5194/acp-17-5407-2017, we can compute a normalized AK
+        # Each element, a_j, of the column AK gets divided by w_j / W, where w_j is the 
+        # pressure weight for the true state level without subsetting the column and W is the sum
+        # of w_j's within the subset. This normalizes the column AK by dividing by the impact that
+        # level would have if the full change in that level went into the column amount.
+        _, pwf_level_all, _ = calculate_xvmr(np.ones_like(pres_good), pres_good)
+        frac_800 = np.sum(pwf_level_all[i_bottom:i_top+1])
+        tmp = tmp / pwf_level_all * frac_800
+    else:
+        pwf_level_all = None
+        frac_800 = None
+
     if return_with_fills:
         xcol_ak = np.full(pressure_vec.shape, missing_value)
         xcol_ak[ind_not_fill] = tmp
@@ -348,7 +361,7 @@ def _compute_x_col_ft_ak(profile_ak_matrix, pressure_vec, return_with_fills=True
         xcol_ak = tmp
 
     if return_debug_info:
-        return xcol_ak, {'pwf': pwf_level, 'ak_subset': profile_ak_matrix[indp, :][:, ind_not_fill], 'indp': indp}
+        return xcol_ak, {'pwf': pwf_level, 'ak_subset': profile_ak_matrix[indp, :][:, ind_not_fill], 'indp': indp, 'pwf_level_all': pwf_level_all, 'frac_800': frac_800}
     else:
         return xcol_ak
 
