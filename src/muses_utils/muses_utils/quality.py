@@ -1693,7 +1693,7 @@ class PCALowCloudPANFilterer(AbstractFilterWithCache):
         """
         # TODO: in quality, move these methods to a mixin class
         if self._rad_file_fxn is None:
-            rad_file = _find_rad_file_default(l2_file)
+            rad_file = self._fm_pantest_radfile(l2_file)
         else:
             rad_file = Path(self._rad_file_fxn(self, l2_file))
 
@@ -1701,6 +1701,12 @@ class PCALowCloudPANFilterer(AbstractFilterWithCache):
             raise FileNotFoundError(f'Cannot find radiance file, {rad_file}. If it does exist but with a different name, pass a custom rad_file_fxn to the class __init__ method')
 
         return rad_file
+
+    @staticmethod
+    def _fm_pantest_radfile(l2_file):
+        l2_file = Path(l2_file)
+        return l2_file.parent / 'Products_Radiance-FM-pantest.nc'
+
 
 
 class PCALowCloudPANFiltererOld(AbstractQualityFilterer):
@@ -1971,9 +1977,8 @@ class PCALowCloudPANFiltererOld(AbstractQualityFilterer):
     def _find_rad_file(self, l2_file: str) -> Path:
         """Find the radiance file; raise a FileNotFoundError if it is missing
         """
-        # TODO: in quality, move these methods to a mixin class
         if self._rad_file_fxn is None:
-            rad_file = _find_rad_file_default(l2_file)
+            rad_file = self._fm_pantest_radfile(l2_file)
         else:
             rad_file = Path(self._rad_file_fxn(self, l2_file))
 
@@ -2066,7 +2071,7 @@ def _find_rad_file_default(l2_file: str) -> Path:
     if 'Lite' in l2_file.name:
         rad_fname = l2_file.name.replace('Lite_Products_L2', 'Products_Radiance').replace('-0', '')
     else:
-        rad_fname = l2_file.name.replace('L2-PAN-0', 'Radiance-PAN')
+        rad_fname = l2_file.name.replace('Products_L2', 'Products_Radiance').replace('-0', '')
     return l2_file.parent / rad_fname
 
 
