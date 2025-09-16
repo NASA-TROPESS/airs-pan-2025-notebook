@@ -281,7 +281,7 @@ def _compute_rodgers_xcols(match_df: pd.DataFrame, airs_ak_dset: xr.Dataset, cri
 
         if np.all(np.isnan(x_airs)) or np.all(np.isnan(x_cris)):
             out_df.loc[airs_sid, 'ak_error_flag'] = -1
-            print(f'\nAt least one of AIRS {airs_sid} and CrIS {cris_sid} have all fills, skipping')
+            # print(f'\nAt least one of AIRS {airs_sid} and CrIS {cris_sid} have all fills, skipping')
             continue
 
         if not _check_priors_consistent(xa_airs, xa_cris):
