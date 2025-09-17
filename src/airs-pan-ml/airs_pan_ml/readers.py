@@ -17,7 +17,7 @@ from muses_utils.atmosphere import column_integrate, calculate_xvmr
 from typing import Dict, Optional, Sequence, Union
 
 
-def load_xpan_dataframe(keys: Sequence[str], land_only: bool = True, airs_l2_files: Optional[dict] = None,
+def load_xpan_dataframe(keys: Sequence[str], land_only: bool = False, airs_l2_files: Optional[dict] = None,
                         cris_l2_files: Optional[dict] = None, apply_cris_h2o_filter: bool = True,
                         do_ak_correction: bool = True) -> pd.DataFrame:
     """Load a dataframe containing the AIRS and CrIS data.
@@ -112,7 +112,7 @@ def load_xpan_dataframe(keys: Sequence[str], land_only: bool = True, airs_l2_fil
     return pd.concat(dfs, axis=0)
 
 
-def load_original_cris_xpan(cris_file: str, land_only: bool = True) -> pd.DataFrame:
+def load_original_cris_xpan(cris_file: str, land_only: bool = False) -> pd.DataFrame:
     """Load XPAN800 from a non-interpolated CrIS combined file.
 
     Parameters
@@ -395,7 +395,7 @@ def _check_priors_consistent(xa1, xa2):
     return np.all(dxa < 0.01)
 
 
-def load_and_merge_quality_vars(orig_df: pd.DataFrame, airs_combine_dirs: Optional[dict] = None) -> pd.DataFrame:
+def load_and_merge_quality_vars(orig_df: pd.DataFrame, airs_combine_dirs: Optional[dict] = None, land_only: bool = False) -> pd.DataFrame:
     """Load the variables MUSES uses for quality filtering and merge with an existing dataframe.
 
     Parameters
@@ -520,7 +520,7 @@ def load_and_merge_radiance_vars(orig_df: pd.DataFrame, airs_combine_dirs: Optio
     return pd.merge(orig_df, rad_df, left_index=True, right_index=True, how='left')
 
 
-def _load_muses_dataset(combined_file, land_only=True):
+def _load_muses_dataset(combined_file, land_only=False):
     with ncdf.Dataset(combined_file) as ds:
         xpan_found = 'XPAN800' in ds.groups['Retrieval'].variables.keys()
         vars = {
@@ -580,7 +580,7 @@ def calc_xpan800(combined_ds, xx_keep=None):
     return xpan[xx_keep]
 
 
-def _load_helper(file, variables, sid_var='SoundingID', land_only=True):
+def _load_helper(file, variables, sid_var='SoundingID', land_only=False):
     if not isinstance(variables, dict):
         variables = {v: v for v in variables}
 
