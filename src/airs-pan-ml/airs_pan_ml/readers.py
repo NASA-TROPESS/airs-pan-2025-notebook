@@ -325,7 +325,7 @@ def _compute_rodgers_xcols(match_df: pd.DataFrame, airs_ak_dset: xr.Dataset, cri
     return out_df
 
 
-def _compute_x_col_ft_ak(profile_ak_matrix, pressure_vec, return_with_fills=True, return_debug_info=False, normalize=False):
+def _compute_x_col_ft_ak(profile_ak_matrix, pressure_vec, return_with_fills=True, return_debug_info=False, normalize=None):
     pres_range = (215.0, 825.1)
     missing_value = -999.0
 
@@ -341,7 +341,7 @@ def _compute_x_col_ft_ak(profile_ak_matrix, pressure_vec, return_with_fills=True
     _, pwf_level, _ = calculate_xvmr(np.ones_like(pressure_vec[indp]), pressure_vec[indp])
 
     tmp = pwf_level @ profile_ak_matrix[indp,:][:, ind_not_fill]
-    if normalize:
+    if normalize == 'weights':
         # From Eq. (11) of https://doi.org/10.5194/acp-17-5407-2017, we can compute a normalized AK
         # Each element, a_j, of the column AK gets divided by w_j / W, where w_j is the 
         # pressure weight for the true state level without subsetting the column and W is the sum
@@ -350,6 +350,8 @@ def _compute_x_col_ft_ak(profile_ak_matrix, pressure_vec, return_with_fills=True
         _, pwf_level_all, _ = calculate_xvmr(np.ones_like(pres_good), pres_good)
         frac_800 = np.sum(pwf_level_all[i_bottom:i_top+1])
         tmp = tmp / pwf_level_all * frac_800
+    elif normalize == 'srak':
+        tmp = np.sum(profile_ak_matrix[indp,:][:, ind_not_fill], axis=0)
     else:
         pwf_level_all = None
         frac_800 = None
